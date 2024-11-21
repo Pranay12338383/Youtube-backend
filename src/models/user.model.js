@@ -70,7 +70,7 @@ userSchema.pre("save" , async  function (next) {
     // agar password modified nhi hua hai to next pe chale jao 
     if(!this.isModified("password")) return next();
     
-    // warna password change kar do
+    // warna us password ko bcrypt kar do
     this.password = bcrypt.hash(this.password , 10)
     next();
     
