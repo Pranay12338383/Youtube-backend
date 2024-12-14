@@ -4,6 +4,7 @@ import { ApiError } from "../utils/apiError.js"
 
 import { User } from "../models/user.model.js"
 
+// import { upLodOnCloudinary } from "../utils/cloudinary.js"
 import { upLodOnCloudinary } from "../utils/cloudinary.js"
 
 import { ApiResponse } from "../utils/ApiResponse.js"
@@ -11,7 +12,7 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 // below functin will register user
 
 const registerUser = asyncHandler( async (req , res) => {
-   
+    
     // steps
     // 1 get user details from frontend
     // 2 validation - not empty
@@ -30,7 +31,7 @@ const registerUser = asyncHandler( async (req , res) => {
     // this is step 2
     // for this import Api error 
     if(
-        [fullname, email, username, password].some((field) =>
+        [fullName, email, username, password].some((field) =>
             field?.trim() === "")       
     ) {
            throw new ApiError(400 , "All fields are required") 
@@ -38,16 +39,24 @@ const registerUser = asyncHandler( async (req , res) => {
         
     // this is step 3 
     // for this import User from models
-    const existedUser = User.findOne({
+    const existedUser = await  User.findOne({
         $or: [{ username } , { email }]
     })
     if(existedUser){
         throw new ApiError(409 , "User with this name and email already exists")
     }
+    
 
     // this is step 4
-    const avatarLocalPath = req.files?.avatar[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    const avatarLocalPath = req.files?.avatar[0]?.path
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path
+
+    let coverImageLocalPath;
+    if(req.files && Array.isArray(req.files.coverImage) && 
+                   req.files.coverImage.length > 0)
+                   {
+                      coverImageLocalPath = req.files.coverImage[0].path
+                   }
 
     if(!avatarLocalPath){
         throw new ApiError(400 , "Avatar file is required")
@@ -55,12 +64,11 @@ const registerUser = asyncHandler( async (req , res) => {
 
     // this is step 5
     // for this import cloudinary from utils cloudinary.js
-    const avatar = await upLodOnCloudinary(avatarLocalPath)
-    const coverImage = await upLodOnCloudinary(coverImageLocalPath)
-
-    if(!avatarLocalPath){
-        throw new ApiError(400 , "Avatar file is required")
-    } 
+      const avatar = await upLodOnCloudinary(avatarLocalPath)
+      const coverImage = await upLodOnCloudinary(coverImageLocalPath)
+      if(!avatar) {
+        throw new ApiError(400 , "Avatar file is Required")
+      }
 
     // this is step 6 
     // here only " User " is talking to database 
@@ -68,7 +76,7 @@ const registerUser = asyncHandler( async (req , res) => {
         fullName,
         avatar: avatar.url,
         coverImage: coverImage?.url || "" ,
-        // means agar coverimage hai to uska url nikal lo warna empty rahen do
+        // means agar coverImage hai to uska url nikal lo warna empty rahen do
         email,
         password,
         username: username.toLowerCase()
@@ -91,5 +99,8 @@ const registerUser = asyncHandler( async (req , res) => {
 
     
 })
+
+
+
 
 export {registerUser}

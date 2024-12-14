@@ -2,10 +2,6 @@ import {v2 as cloudinary} from "cloudinary"
 
 import fs from "fs"  // file system --> help to do manage file system
 
-import { v2 as cloudinary } from 'cloudinary';
-
-
-
 // Configuration
  cloudinary.config({ 
         cloud_name: 'process.env.CLOUDINARY_CLOUD_NAME', 
@@ -20,17 +16,18 @@ const upLodOnCloudinary =  async (localFilePath) => {
         if(!localFilePath) return null;
 
         //now next step is to upload the file on cloudinary 
-        const response = awaitcloudinary.uploader.upload(localFilePath, {
-            resource_type: "auto"
+        const response = await cloudinary.uploader.upload(localFilePath, {
+            resource_type: "auto",
+            debug: true,
         })
         // now the file has been uploaded successfully
-        console.log("file is uploaded on cloudinary", response.url);
+        // console.log("file is uploaded on cloudinary", response.url);
+        fs.unlink(localFilePath)
         return response;  
 
-    } catch(error){
+    } catch (error) {
+        fs.unlinkSync(localFilePath)
 
-        fs.unlink(localFilePath)// will remove the locally saved 
-        // temperory file as the upload got failed
         return null;
     }
 }
