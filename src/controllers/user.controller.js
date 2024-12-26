@@ -1,16 +1,33 @@
 import { asyncHandler }  from "../utils/asyncHandlers.js" 
-
 import { ApiError } from "../utils/apiError.js"
-
 import { User } from "../models/user.model.js"
-
 // import { upLodOnCloudinary } from "../utils/cloudinary.js"
 import { upLodOnCloudinary } from "../utils/cloudinary.js"
-
 import { ApiResponse } from "../utils/ApiResponse.js"
+import { response } from "express"
+import jwt from "jsonwebtoken"
+
+
+const generateAccessAndRefreshTokens = async(userId) =>{
+
+    try {
+      const user = await User.findById(userId)// will give access of user
+      const accessToken = user.generateAccessToken()
+      const refreshToken = user.generateRefreshToken()
+
+      // ab refresh token ko database me save kardo taki user ko baar 
+      // baar login na krna ho 
+      user.refreshToken = refreshToken
+      await user.save(validateBeforeSave, false)
+
+      return {accessToken , refreshToken}
+
+    } catch(error){
+          throw new ApiError(500 , "Something went wrong while generating access and refresh tokens " , error)
+    }
+} 
 
 // below functin will register user
-
 const registerUser = asyncHandler( async (req , res) => {
     
     // steps
@@ -100,7 +117,165 @@ const registerUser = asyncHandler( async (req , res) => {
     
 })
 
+const loginUser = asyncHandler( async(req , res) => {
+       //req body -> data  le kar aao 
+       // username or email 
+       // find the user in the database
+       // password check 
+       // if password is right then ,
+       // generate access and refresh tocken 
+       // send cookies 
+        
+       // step 1 : req.body se data le kar aao 
+       const{email , username , password} = req.body
+
+       if( !(email || username) ) {
+        throw new ApiError(400 , "username or email is required")
+       }
+       
+       // find the user in the database
+       const user = await User.findOne({
+         $or: [{username } , {email}]
+       })
+       
+       // if user is not found 
+       if(!user){
+        throw new ApiError(404 , "User  does not exist")
+       }
+
+       // if user found 
+       // check password
+       const isPasswordValid = await user.isPasswordCorrect(password)
+       
+       if(!isPasswordValid){
+        throw new ApiError(401 , "Password is invalid")
+       }
+       
+       // Now since the password is correct
+       // we need to generate access and refresh token 
+       // access and refresh token bahot jagah use hoge isiliye 
+       // ek seperate method bana lete hai , har jagah wahi use kar lege
+
+       // humko refresh aur access dono token mil gya hai ab 
+       const{accessToken , refreshToken} = await generateAccessAndRefreshTokens(user._id)
+
+       // cookies 
+       const options = {
+        // only server se modify kar skte ho frontend se nhi 
+        // this will enhance security 
+        httpOnly: true,
+        secure: true
+       }
+
+       return res
+       .status(200)
+       .cookie("accessToken" , accessToken , options)
+       .cookie("refreshToken" , refreshToken , options)
+       .json(
+        new ApiResponse(
+            200 , {
+                user: accessToken, refreshToken, 
+            },
+            "User Logged In Successfully"
+        )
+       )
+})
+
+const logoutUser =  asyncHandler(async (req , res) => {
+       await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $set: {
+                    refeshToken: undefined
+                }
+            },
+            {
+                new: true
+            }
+         )
+
+         const options = {
+            httpOnly: true,
+            secure: true
+         }
+
+         return res
+         .status(200)
+         .clearCookie("accessToken", options)
+         .clearCookie("refreshToken", options)
+         .json(new ApiResponse(200 , {} , "User logged out successfully"))
+
+})
 
 
+const refreshAccessToken = asyncHandler(async (req , res) => {
+    // ek refresh token database me save hai 
+    // aur ye wala refresh token jo hai wo cookies se aa rha hai  
+    const incomingRefreshToken = await req.cookies.refeshToken || req.body.refreshToken // body uske liye jo mobile me use karega esko 
 
-export {registerUser}
+    if(!incomingRefreshToken){
+        throw new ApiError(401 , "Unauthorized request")
+    }
+    
+    // agar decode nhi karege to pata nhi chal payega ki uss
+    // uss refresh token me kya hai , phir hum compare nhi kare
+    // payege dono ko 
+    // isiliye pahle jo token hai usko decode kar liya 
+    try {
+        const decodedToken = jwt.verify(
+            incomingRefreshToken,
+            process.env.REFRESH_TOKEN_SECRET
+            
+            //matlab ab hume uss user ka refresh token mil gya hai
+            // aur uss refresh token ke andar , user ki _id bhi hai
+        )
+         
+        // phir uss user ki ._id pata kar liya 
+        const user = await User.findById(decodedToken?._id)
+    
+        if(!user){
+            throw new ApiError(401 , "Invalid refresh token")
+        }
+    
+        // aur ab compare karege incomingRefreshToken aur ye decoded
+        // wala jo token hai 
+    
+        if(incomingRefreshToken !== user?.refeshToken){
+            throw new ApiError(401 , "Refresh token is expired or used")
+        }
+    
+        const options = {
+            httpOnly: true,
+            secure: true
+        }
+    
+        const {accessToken , newrefreshToken } = await generateAccessAndRefreshTokens(user._id)
+    
+        return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", newrefreshToken, options)
+        .json(
+            new ApiResponse(
+                200 , 
+                {accessToken , refreshToken: newrefreshToken},
+                "Access token refreshed successfully"          
+            )
+    )
+    
+    } catch (error) {
+        throw new ApiError(401, error?.message || "Invalid refresh token")
+    }
+
+})
+
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken
+}
+
+// export {loginUser}
+// export {logoutUser}

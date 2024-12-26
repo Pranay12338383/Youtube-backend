@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { registerUser } from "../controllers/user.controller.js"
+import { loginUser , registerUser, logoutUser, refreshAccessToken } from "../controllers/user.controller.js"
 import { upload } from "../middlewares/multer.middleware.js" 
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
@@ -22,15 +23,26 @@ router.route("/register").post(
             maxCount: 1
         }
     ]),
-    registerUser);
-
-
-
-
+    registerUser
+         );
     // router.post('/register', upload.fields([{ name: 'avatar' }, { name: 'coverImage' }]), (req, res) => {
-    //     console.log('Request Files:', req.files);
-    //     res.status(200).json({ files: req.files });
-    //   });
+   //  console.log('Request Files:', req.files);
+  //     res.status(200).json({ files: req.files });
+ //   });
 
 
-export default router
+ router.route("/login").post(loginUser)
+
+ // secured routes
+ // pahle verifyJWT karo uske baad logoutUser me chale jao 
+ router.route("/logout").post(verifyJWT , logoutUser)
+
+ router.route("/refresh-token").post(refreshAccessToken)
+
+
+
+
+
+
+
+export default router                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
