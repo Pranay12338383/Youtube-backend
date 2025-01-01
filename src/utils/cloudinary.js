@@ -11,7 +11,6 @@ import fs from "fs"  // file system --> help to do manage file system
 
 
 const upLodOnCloudinary =  async (localFilePath) => {
-
     try{
         if(!localFilePath) return null;
 
