@@ -1,6 +1,6 @@
-backend for 
+backend for video Platform 
 
-This is video series for backend with pranay for javaScript
+backend with pranay for javaScript
 
 Model link https://app.eraser.io/workspace/YtPqZ1VogxGy1jzIDkzj
 
